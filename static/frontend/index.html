@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta id="theme-color" name="theme-color" content="#fff">
+    <base target="_blank">
+
+    <title>mediaRecorder-webSocket-mediaSource</title>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+
+        video {
+            max-width: 100%;
+            width: 320px;
+        }
+
+        button {
+            margin: 0 3px 10px 0;
+            width: 99px;
+            padding-left: 2px;
+            padding-right: 2px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+        <h1>mediaRecorder-webSocket-mediaSource</h1>
+        <video id="localVideo" autoplay muted></video>
+        <video id="remoteVideo" autoplay controls></video>
+        <div>
+            <button id="streamingBtn">Start Streaming</button>
+        </div>
+        <div id="substatus">Not connected</div>
+        <div id="pubstatus">Not connected</div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.0/socket.io.js"></script>
+    <script src="./js/main.js"></script>
+</body>
+
+</html>

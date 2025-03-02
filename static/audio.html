@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body class="page">
+    <h1>HTML example</h1>
+    <video
+      crossorigin="anonymous"
+      autoplay
+      style="border: 2px solid black"
+      id="video"
+    ></video>
+    <audio autoplay crossorigin="anonymous" id="audio"></audio>
+    <button id="test">Start recording</button>
+  </body>
+
+  <style>
+    .page {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    video {
+      border: 2px solid black;
+      height: 200px;
+    }
+    button {
+      margin-top: 20px;
+      border: 2px solid black;
+      padding: 4px 10px;
+    }
+  </style>
+
+  <!-- Generated automatically after build, check out package.json -->
+  <script src="./bundle.js"></script>
+  <script>
+    const video = document.getElementById("video");
+    const audio = document.getElementById("audio");
+    const button = document.getElementById("test");
+    button.addEventListener("click", () => {
+      start();
+    });
+    // Setting up the recorder
+    const recorder = new MediaSocket.Recorder({
+      wsUrl: `wss://${window.location.host}/publish/test_stream_audio`,
+      recordingOptions: {
+        timeSlice: 10,
+        media: {
+          audio: true,
+          video: true,
+        },
+      },
+    });
+    // Setting up the player
+    const player = new MediaSocket.Player({
+      wsUrl: `wss://${window.location.host}/consume/test_stream_audio`,
+      playingOptions: {
+        element: video, // or audio if you want to pass just the audio
+        media: {
+          audio: true,
+          video: true,
+        },
+      },
+    });
+
+    async function start() {
+      await recorder.setupRecorder();
+      await player.setupPlayer();
+      recorder.startRecording();
+      player.startPlaying();
+    }
+  </script>
+</html>

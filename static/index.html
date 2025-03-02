@@ -1,0 +1,109 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raw Audio Capture</title>
+    <script type="text/javascript">
+      LIBOPUS_WASM_URL = "libopusjs/dist/libopus.wasm";
+    </script>
+    <script src="opus-decoder.js"></script>
+    <script type="text/javascript" src="libopusjs/dist/libopus.wasm.js"></script>
+    <!-- <script type="text/javascript" src="libopusjs/examples/test/main.js"></script> -->
+</head>
+<body>
+    <button id="startButton">Start Capturing</button>
+    <button id="stopButton" disabled>Stop Capturing</button>
+    <div id="status"></div>
+
+    <script>
+        let enc;
+        let dec;
+        libopus.onload = function() {
+            console.log("libopus loaded");
+            enc = new libopus.Encoder(1,48000,24000,20,false);
+            dec = new libopus.Decoder(1,48000);
+        };
+    
+        const decoder = new window["opus-decoder"].OpusDecoder();
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const statusDiv = document.getElementById('status');
+
+
+
+        let audioContext;
+        let mediaStream;
+        let scriptNode;
+        let sourceNode;
+
+        const bufferSize = 4096;
+        const sampleRate = 48000;
+        startButton.addEventListener('click', startCapturing);
+        stopButton.addEventListener('click', stopCapturing);
+
+        async function startCapturing() {
+
+        // wait for the WASM to be compiled
+        await decoder.ready;
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                sourceNode = audioContext.createMediaStreamSource(mediaStream);
+
+                scriptNode = audioContext.createScriptProcessor(bufferSize, 1, 1);
+                sourceNode.connect(scriptNode);
+                scriptNode.connect(audioContext.destination);
+                scriptNode.onaudioprocess = (audioProcessingEvent) => {
+                    const inputBuffer = audioProcessingEvent.inputBuffer;
+                    const inputData = inputBuffer.getChannelData(0);
+                    
+                    // Clone the Float32Array because it gets overwritten in the next event
+                    const frameData = new Float32Array(inputData);
+                    enc.input(frameData);
+                    var data = enc.output();
+                    var tsize = 0;
+                    var tsamples = 0;
+                    let kek = decoder.decodeFrame(data);
+                    console.log(kek.channelData[1]);
+                    let myArrayBuffer = new AudioBuffer({length: kek.channelData[1].length, sampleRate: 48000});
+                    myArrayBuffer.copyToChannel(kek.channelData[1], 0, 0);
+
+                    var source = audioContext.createBufferSource();
+                    source.buffer = myArrayBuffer;
+                    source.connect(audioContext.destination);
+                    source.start();
+                    statusDiv.textContent = `Captured frames: ${frames.length}`;
+                };
+
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                statusDiv.textContent = 'Capturing audio...';
+            } catch (error) {
+                console.error('Error starting audio capture:', error);
+                statusDiv.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function stopCapturing() {
+            if (scriptNode) {
+                scriptNode.disconnect();
+                sourceNode.disconnect();
+            }
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+            }
+            if (audioContext) {
+                audioContext.close();
+            }
+
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            statusDiv.textContent = `Capturing stopped. Total frames: ${frames.length}`;
+
+            console.log('Captured frames:', frames);
+        }
+    </script>
+</body>
+</html>

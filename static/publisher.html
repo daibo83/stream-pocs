@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta id="theme-color" name="theme-color" content="#fff">
+    <base target="_blank">
+
+    <title>mediaRecorder-webSocket-mediaSource</title>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+
+        video {
+            max-width: 100%;
+            width: 320px;
+        }
+
+        button {
+            margin: 0 3px 10px 0;
+            width: 99px;
+            padding-left: 2px;
+            padding-right: 2px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+        <h1>mediaRecorder-webSocket-mediaSource</h1>
+        <video id="localVideo" autoplay muted></video>
+        <div>
+            <button id="streamingBtn">Start Streaming</button>
+        </div>
+        <div id="pubstatus">Not connected</div>
+    </div>
+    <script>
+
+const streamingBtn = document.querySelector('button#streamingBtn');
+streamingBtn.onclick = toggleStreaming;
+const pubstatusDiv = document.getElementById('pubstatus');      
+const pubsocket = new WebSocket(`wss://${window.location.host}/publish/test_stream`);
+pubsocket.binaryType ="arraybuffer";
+pubsocket.onopen = () => {
+    pubstatusDiv.textContent = 'Connected';
+};
+        function successCallback(stream) {
+    console.log('getUserMedia() got stream: ', stream);
+    stream.inactive = eventTest;
+    window.stream = stream;
+    localVideo.srcObject = stream;
+    localVideo.onloadedmetadata = function (event) {
+        console.log("onloadedmetadata", event);
+    }
+    localVideo.addEventListener('play', (event) => {
+        console.log("play", event);
+    });
+}
+
+function eventTest(event) {
+    console.log('event Test', event);
+}
+const constraints = {
+    audio: true,
+    // video: false
+    video: {
+        width: { ideal: 1920},
+        height: { ideal: 1080 },
+        frameRate: { ideal: 60 }
+    }
+};
+
+navigator.mediaDevices.getUserMedia(constraints).then(successCallback).catch(errorCallback);
+function errorCallback(error) {
+    console.log('navigator.getUserMedia error: ', error);
+}
+
+function handleDataAvailable(event) {
+    if (event.data && event.data.size > 0) {
+        pubsocket.send(event.data);
+    }
+}
+
+function handleStop(event) {
+    console.log('Recorder stopped: ', event);
+}
+
+function toggleStreaming() {
+    if (streamingBtn.textContent === 'Start Streaming') {
+        startStreaming();
+    } else {
+        stopStreaming();
+        streamingBtn.textContent = 'Start Streaming';
+    }
+}
+
+function startStreaming() {
+    // const options = { mimeType: 'audio/webm; codecs=opus' };
+    // const options = { mimeType: 'video/webm; codecs="vp8, opus"' };
+    const options = {
+        audioBitsPerSecond: 128000,
+        videoBitsPerSecond: 7500000,
+        mimeType: 'video/webm; codecs="vp8, opus"',
+      };
+    try {
+        mediaRecorder = new MediaRecorder(window.stream, options);
+    } catch (e0) {
+        console.log('Unable to create MediaRecorder with options Object: ', e0);
+        try {
+            options = { mimeType: 'video/webm,codecs=vp8', bitsPerSecond: 100000 };
+            mediaRecorder = new MediaRecorder(window.stream, options);
+        } catch (e1) {
+            console.log('Unable to create MediaRecorder with options Object: ', e1);
+            try {
+                options = 'video/vp8'; // Chrome 47
+                mediaRecorder = new MediaRecorder(window.stream, options);
+            } catch (e2) {
+                alert('MediaRecorder is not supported by this browser.\n\n' +
+                    'Try Firefox 29 or later, or Chrome 47 or later, with Enable experimental Web Platform features enabled from chrome://flags.');
+                console.error('Exception while creating MediaRecorder:', e2);
+                return;
+            }
+        }
+    }
+    console.log('Created MediaRecorder', mediaRecorder, 'with options', options);
+    streamingBtn.textContent = 'Stop Streaming';
+    mediaRecorder.onstop = handleStop;
+    mediaRecorder.ondataavailable = handleDataAvailable;
+    mediaRecorder.start(1); // time slice 1ms
+    console.log('MediaRecorder started', mediaRecorder);
+}
+
+function stopStreaming() {
+    socket.disconnect();
+    mediaRecorder.stop();
+}
+    </script>
+</body>
+
+</html>

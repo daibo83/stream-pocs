@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        #videoPlayer {
+            max-width: 640px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        #status {
+            font-weight: bold;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="640" height="480"></canvas>
+    <!-- <video id="videoPlayer" autoplay controls></video> -->
+    <button id="startButton">Start Playing</button>
+    <div id="status">Not connected</div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let pendingFrames = [];
+        let underflow = true;
+        let baseTime = 0;
+        function handleFrame(frame) {
+            pendingFrames.push(frame);
+            if (underflow) setTimeout(renderFrame, 0);
+        }
+        function calculateTimeUntilNextFrame(timestamp) {
+            if (baseTime == 0) baseTime = performance.now();
+            let mediaTime = performance.now() - baseTime;
+            return Math.max(0, timestamp / 1000 - mediaTime);
+        }
+
+
+        async function renderFrame() {
+            underflow = pendingFrames.length == 0;
+            if (underflow) return;
+
+            const frame = pendingFrames.shift();
+
+            // Based on the frame's timestamp calculate how much of real time waiting
+            // is needed before showing the next frame.
+            const timeUntilNextFrame = calculateTimeUntilNextFrame(frame.timestamp);
+            await new Promise((r) => {
+                setTimeout(r, timeUntilNextFrame);
+            });
+            var aspectRatio = frame.codedWidth / frame.codedHeight;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerWidth / aspectRatio;
+            ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+            frame.close();
+
+            // Immediately schedule rendering of the next frame
+            setTimeout(renderFrame, 0);
+        }
+
+        const statusDiv = document.getElementById('status');        
+        const startButton = document.getElementById('startButton');
+        const websocketUrl = `wss://${window.location.host}/consume/test_stream`;
+        const init = {
+            output: handleFrame,
+            error: (e) => {
+                console.log(e.message);
+            },
+        };
+
+        const config = {
+    codec: "avc1.640c34",
+    codedHeight: 1080,
+    codedWidth: 1920,
+    colorSpace: {
+        fullRange: false,
+        matrix: "smpte170m",
+        primaries: "bt709",
+        transfer: "bt709"
+    },
+    hardwareAcceleration: "no-preference"
+}
+        config.avc = { 
+            format: "annexb",
+            maxBFrames: 0,
+        };
+        let mediaSource;
+        let sourceBuffer;
+        let websocket;
+        let queue = [];
+        let isBufferUpdating = false;
+        let decoder;
+
+        // decoder = new VideoDecoder(init);
+        // decoder.configure(config);
+        async function startPlaying(){
+            const { supported } = await VideoDecoder.isConfigSupported(config);
+            if (supported) {
+                decoder = new VideoDecoder(init);
+                decoder.configure(config);
+            } else {
+                console.log('Configuration not supported');
+            }
+            websocket = new WebSocket(websocketUrl);
+            websocket.binaryType ="arraybuffer";
+            websocket.onopen = () => {
+                statusDiv.textContent = 'Connected';
+            };
+            websocket.onmessage = (event) => {
+                const chunk = new EncodedVideoChunk({
+                    timestamp: 0,
+                    type: "key",
+                    data: event.data,
+                });
+                if (decoder.state == "closed") {
+                    decoder = new VideoDecoder(init);
+                    decoder.configure(config);
+                }
+                try {
+                    decoder.decode(chunk);
+                } catch (error) {
+                    console.log("handle error", error);
+                }
+            };
+            await decoder.flush();
+        }
+        startButton.addEventListener('click', startPlaying);
+    </script>
+</body>
+</html>

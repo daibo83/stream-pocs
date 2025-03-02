@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raw Audio Capture</title>
+    <!-- load OpusMediaRecorder.umd.js. OpusMediaRecorder will be loaded. -->
+    <script src="https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/OpusMediaRecorder.umd.js"></script>
+    <!-- load encoderWorker.umd.js. This should be after OpusMediaRecorder. -->
+    <!-- This script tag will create OpusMediaRecorder.encoderWorker. -->
+    <script src="https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/encoderWorker.umd.js"></script>
+</head>
+<body>
+    <video autoplay id="video"></video>
+    <audio autoplay id="audio">
+      </audio>
+    
+    <button id="startButton">Start Capturing</button>
+    <button id="stopButton" disabled>Stop Capturing</button>
+    <div id="status"></div>
+
+    <script>
+        const workerOptions = {
+            OggOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/OggOpusEncoder.wasm',
+            WebMOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/WebMOpusEncoder.wasm'
+        };
+
+	    // window.MediaRecorder = OpusMediaRecorder;
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const statusDiv = document.getElementById('status');
+
+        let audioContext;
+        let mediaStream;
+        let scriptNode;
+        let sourceNode;
+
+        const bufferSize = 4096;
+        const sampleRate = 48000;
+        const frames = [];
+        let ws = new WebSocket(`wss://${window.location.host}/publish/test_stream_audio`);
+        // ws.binaryType = "arraybuffer";
+        ws.onopen = () => {
+            statusDiv.textContent = 'Connected';
+        };
+        startButton.addEventListener('click', start_streaming);
+        // stopButton.addEventListener('click', stopCapturing);
+        async function start_streaming(params) {
+            navigator.mediaDevices.getUserMedia({
+                video: false,
+                audio: true
+            }).then((stream) => {
+                const options = {
+                    audioBitsPerSecond: 128000,
+                    // videoBitsPerSecond: 2500000,
+                    // mimeType: "video/webm;codecs=vp8, opus",
+                    mimeType: "audio/webm;codecs=opus",
+                };
+
+                const recorder = new OpusMediaRecorder(stream, options, workerOptions);
+                recorder.ondataavailable = (event) => {
+                    // console.log(event.data);
+                    ws.send(event.data);
+                };
+                recorder.start(1);
+            });
+        }
+        let socket = new WebSocket(`wss://${window.location.host}/consume/test_stream_audio`);
+        let mediaSource = new MediaSource();
+        // const video = document.getElementById('video');
+        // video.src = URL.createObjectURL(mediaSource); 
+        const audio = document.getElementById('audio');
+        audio.src = URL.createObjectURL(mediaSource);
+        let sourceBuffer;
+        mediaSource.addEventListener('sourceopen', () => {
+            sourceBuffer = mediaSource.addSourceBuffer('audio/webm;codecs=opus');
+        });
+        // mediaSource.onsourceopen = () => {
+        //     // sourceBuffer = mediaSource.addSourceBuffer('video/webm;codecs=vp8, opus');
+        //     console.log('source open');
+        //     sourceBuffer = mediaSource.addSourceBuffer('audio/webm;codecs=opus');
+        // }
+        // sourceBuffer = mediaSource.addSourceBuffer('video/mp4;codecs=avc1.640028, opus');
+        socket.onmessage = (message) => {
+            if (!sourceBuffer) {
+                video.play();
+            }
+            
+            message.data.arrayBuffer().then((arrayBuffer) => {
+                sourceBuffer.appendBuffer(arrayBuffer);
+            });
+        };
+        function getMediaSource() {
+            if (window.ManagedMediaSource) {
+                return new window.ManagedMediaSource();
+            }
+            if (window.MediaSource) {
+                return new window.MediaSource();
+            }
+
+            throw new Error('MediaSource or ManagedMediaSource is not supported');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mic to Opus Encoder</title>
+    <script src="ws-audio-api.min.js"></script>
+</head>
+<body>
+    <button id="startButton">Start Recording</button>
+    <button id="stopButton" disabled>Stop Recording</button>
+    <div id="status">Not connected</div>
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const startButton2 = document.getElementById('startButton2');
+        const statusDiv = document.getElementById('status');
+        startButton.onclick = async () => {
+            var streamer = new WSAudioAPI.Streamer({
+                codec: {
+                    sampleRate: 48000,
+                    channels: 1,
+                    app: 2051,
+                    frameDuration: 2.5,
+                    bufferSize: 256
+                },
+                server: `wss://${window.location.host}/publish/test_stream_audio`,
+            });
+            try {
+                await streamer.start();
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                statusDiv.textContent = 'Recording...';
+            } catch (e) {
+                console.error(e);
+                statusDiv.textContent = 'Failed to start recording';
+            }
+        };
+    </script>
+</body>
+</html>
