@@ -41,8 +41,8 @@ const constraints = {
 navigator.mediaDevices.getUserMedia(constraints).then(successCallback).catch(errorCallback);
 
 mediaSource.addEventListener('sourceopen', function (e) {
-    // const mimeCodec = 'audio/webm; codecs=opus';
-    const mimeCodec = 'video/webm; codecs="vp8, opus"';
+    const mimeCodec = 'video/mp4;codecs=avc1.640c3e,mp4a.40.2';
+    // const mimeCodec = 'video/webm; codecs="vp8, opus"';
     sourceBuffer = mediaSource.addSourceBuffer(mimeCodec);
     // sourceBuffer.mode = 'segments';
     sourceBuffer.addEventListener('updateend', function () {
@@ -52,7 +52,7 @@ mediaSource.addEventListener('sourceopen', function (e) {
             const ranges = sourceBuffer.buffered;
             const bufferLength = ranges.length;
             if (bufferLength != 0) {
-                if (sourceBuffer.buffered.end(0) - remoteVideo.currentTime > 0.5) {
+                if (sourceBuffer.buffered.end(0) - remoteVideo.currentTime > 5) {
                     remoteVideo.currentTime = sourceBuffer.buffered.end(0);
                     console.log("Update currentTime!!!!");
                 }
@@ -127,8 +127,10 @@ function startStreaming() {
     // const options = { mimeType: 'video/webm; codecs="vp8, opus"' };
     const options = {
         audioBitsPerSecond: 128000,
-        videoBitsPerSecond: 7500000,
-        mimeType: 'video/webm; codecs="vp8, opus"',
+        videoBitsPerSecond: 5000000,
+        // mimeType: 'video/webm; codecs="vp8, opus"',
+        mimeType: 'video/mp4;codecs=avc1.640c3e,mp4a.40.2',
+        videoKeyFrameIntervalCount: 15
       };
     try {
         mediaRecorder = new MediaRecorder(window.stream, options);
