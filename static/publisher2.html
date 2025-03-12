@@ -64,10 +64,10 @@
         };
         const config = {
             codec: "avc1.640c34",
-            // codec: "hev1.4.1f.H186.b0",
+            // codec: "hev1.1.0.L30.b0",
             width: 1920,
             height: 1080,
-            bitrate: 8_000_000, // 2 Mbps
+            bitrate: 2_000_000, // 2 Mbps
             framerate: 60,
             latencyMode: "realtime",
         };
@@ -102,72 +102,55 @@
                     frameRate: { ideal: 60 }
                 }
             };
+            
             const userMedia = webcam ? await navigator.mediaDevices.getUserMedia(constraints) : await navigator.mediaDevices.getDisplayMedia({ video: constraints});
             videoPreview.srcObject = userMedia;
             let frameCounter = 0;
             const track = userMedia.getVideoTracks()[0];
             track.applyConstraints(constraints).catch(e => console.log(e));
             let settings = track.getSettings();
-            let interval = 1000.0/track.getSettings().frameRate;
-            let offscreencanvas = new OffscreenCanvas(settings.width, settings.height);
-            const ctx = offscreencanvas.getContext('2d');
-
-            let worker = new Worker('pubworker.js');
-            worker.postMessage({
-                type: 'init',
-                websocketUrl: websocketUrl,
-                webcam: webcam,
-                encoder_config: config,
-                settings: settings,
-                interval: interval
-            });
-
-            // let alarm = browser.alarms.create("frame", {periodInMinutes: 1});
-            setInterval( async () => {
-                // ctx.drawImage(videoPreview, 0, 0, settings.width, settings.height);
-                const bitmap = await createImageBitmap(videoPreview, 0, 0, settings.width, settings.height);
-                worker.postMessage({
-                    type: 'frame',
-                    bitmap: bitmap
-                });
-                // const bitmap = offscreencanvas.transferToImageBitmap();
-                // var frame = new VideoFrame(bitmap, { timestamp: performance.now() });
-                // if (encoder.encodeQueueSize > 2) {
-                //     // Too many frames in flight, encoder is overwhelmed
-                //     // let's drop this frame.
-                //     frame.close();
-                // } else {
-                //     frameCounter++;
-                //     const keyFrame = frameCounter % 60 == 0;
-                //     encoder.encode(frame, { keyFrame });
-                //     frame.close();
-                // }
-            }, interval);
-
-
-            // const trackProcessor = new MediaStreamTrackProcessor(track);
-            // const reader = trackProcessor.readable.getReader();
-            // while (true) {
-            //     const result = await reader.read();
-            //     if (result.done) break;
-
-            //     const frame = result.value;
-            //     // console.log(frame.timestamp);
-            //     if (encoder.encodeQueueSize > 2) {
-            //         // Too many frames in flight, encoder is overwhelmed
-            //         // let's drop this frame.
-            //         frame.close();
-            //     } else {
-            //         frameCounter++;
-            //         const keyFrame = frameCounter % 60 == 0;
-            //         encoder.encode(frame, { keyFrame });
-            //         frame.close();
-            //     }
-            // }
+            await videoPreview.play();
+            // if safari
+            if (typeof MediaStreamTrackProcessor === "undefined") {
+                const workerTrack = userMedia.getVideoTracks()[0].clone();
+                const worker = new Worker("pubworker.js");
+                worker.postMessage({track: workerTrack}, [workerTrack]);
+                worker.onmessage = function(e) {
+                    const frame = e.data;
+                    if (encoder.encodeQueueSize > 2) {
+                        // Too many frames in flight, encoder is overwhelmed
+                        // let's drop this frame.
+                        frame.close();
+                    } else {
+                        frameCounter++;
+                        const keyFrame = frameCounter % 60 == 0;
+                        encoder.encode(frame, { keyFrame });
+                        frame.close();
+                    }
+                }
+            } else {
+                const trackProcessor = new MediaStreamTrackProcessor(track);
+                const reader = trackProcessor.readable.getReader();
+                while (true) {
+                    const result = await reader.read();
+                    if (result.done) break;
+                    const frame = result.value;
+                    if (encoder.encodeQueueSize > 2) {
+                        // Too many frames in flight, encoder is overwhelmed
+                        // let's drop this frame.
+                        frame.close();
+                    } else {
+                        frameCounter++;
+                        const keyFrame = frameCounter % 60 == 0;
+                        encoder.encode(frame, { keyFrame });
+                        frame.close();
+                    }
+                }
+            }
         }
         function handleChunk(chunk, metadata) {
             if (metadata.decoderConfig) {
-                console.log("Decoder config:", metadata.decoderConfig);
+                // console.log("Decoder config:", metadata.decoderConfig);
                 // websocket.send(JSON.stringify(metadata.decoderConfig));
             }
 

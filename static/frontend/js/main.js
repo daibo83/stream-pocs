@@ -30,19 +30,20 @@ streamingBtn.onclick = toggleStreaming;
 
 const constraints = {
     audio: true,
-    // video: false
-    video: {
-        width: { ideal: 1920},
-        height: { ideal: 1080 },
-        frameRate: { ideal: 60 }
-    }
+    video: false
+    // video: {
+    //     width: { ideal: 640},
+    //     height: { ideal: 360 },
+    //     frameRate: { ideal: 30 }
+    // }
 };
 
 navigator.mediaDevices.getUserMedia(constraints).then(successCallback).catch(errorCallback);
 
 mediaSource.addEventListener('sourceopen', function (e) {
-    const mimeCodec = 'video/mp4;codecs=avc1.640c3e,mp4a.40.2';
+    // const mimeCodec = 'video/mp4;codecs=avc1.42400a,mp4a.40.2';
     // const mimeCodec = 'video/webm; codecs="vp8, opus"';
+    const mimeCodec = 'audio/mp4; codecs=avc1';
     sourceBuffer = mediaSource.addSourceBuffer(mimeCodec);
     // sourceBuffer.mode = 'segments';
     sourceBuffer.addEventListener('updateend', function () {
@@ -126,10 +127,11 @@ function startStreaming() {
     // const options = { mimeType: 'audio/webm; codecs=opus' };
     // const options = { mimeType: 'video/webm; codecs="vp8, opus"' };
     const options = {
-        audioBitsPerSecond: 128000,
-        videoBitsPerSecond: 5000000,
+        audioBitsPerSecond: 64000,
+        videoBitsPerSecond: 1000000,
         // mimeType: 'video/webm; codecs="vp8, opus"',
-        mimeType: 'video/mp4;codecs=avc1.640c3e,mp4a.40.2',
+        // mimeType: 'video/mp4;codecs=avc1.42400a,mp4a.40.2',
+        mimeType: 'audio/mp4; codecs=avc1',
         videoKeyFrameIntervalCount: 15
       };
     try {

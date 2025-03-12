@@ -80,17 +80,19 @@
         };
 
         const config = {
-    codec: "avc1.640c34",
-    codedHeight: 1080,
-    codedWidth: 1920,
-    colorSpace: {
-        fullRange: false,
-        matrix: "smpte170m",
-        primaries: "bt709",
-        transfer: "bt709"
-    },
-    hardwareAcceleration: "no-preference"
-}
+            codec: "avc1.640c34",
+            // codec: "hev1.1.0.L30.b0",
+            codedHeight: 1080,
+            codedWidth: 1920,
+            colorSpace: {
+                fullRange: false,
+                matrix: "smpte170m",
+                primaries: "bt709",
+                transfer: "bt709"
+            },
+            hardwareAcceleration: "no-preference",
+            optimizeForLatency: true,
+        }
         config.avc = { 
             format: "annexb",
             maxBFrames: 0,

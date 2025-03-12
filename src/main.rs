@@ -37,8 +37,8 @@ async fn main() {
     println!("Server started on http://localhost:3030");
     warp::serve(routes)
         .tls()
-        .cert_path("./belo.chat/cert.pem")
-        .key_path("./belo.chat/privkey.pem")
+        .cert_path("./belo.chat/cert4.pem")
+        .key_path("./belo.chat/privkey4.pem")
         .run(([0, 0, 0, 0], 3040))
         .await;
 }
