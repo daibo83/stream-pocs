@@ -79,14 +79,9 @@
                 console.log(e.message);
             },
         };
-        // let description_array = new Uint8Array(([1, 1, 96, 0, 0, 0, 176, 0, 0, 0, 0, 0, 123, 240, 0, 252, 253, 248, 248, 0, 0, 15, 3, 160, 0, 1, 0, 24, 64, 1, 12, 1, 255, 255, 1, 96, 0, 0, 3, 0, 176, 0, 0, 3, 0, 0, 3, 0, 123, 27, 2, 64, 161, 0, 1, 0, 47, 66, 1, 1, 1, 96, 0, 0, 3, 0, 176, 0, 0, 3, 0, 0, 3, 0, 123, 160, 3, 192, 128, 17, 7, 203, 136, 27, 185, 20, 140, 185, 248, 79, 66, 250, 134, 245, 74, 106, 2, 2, 3, 108, 31, 194, 1, 4, 162, 0, 1, 0, 7, 68, 1, 192, 114, 240, 91, 36]));
-        // let arraybuffer = new ArrayBuffer(description_array.length);
-        // arraybuffer = description_array.buffer;
-        // console.log(arraybuffer);
         const config = {
             // codec: "avc1.640c34",
             codec: "hev1.1.0.L30.b0",
-            // description: arraybuffer,
             codedHeight: 1080,
             codedWidth: 1920,
             colorSpace: {
@@ -96,12 +91,8 @@
                 transfer: "bt709"
             },
             hardwareAcceleration: "no-preference",
-            // optimizeForLatency: true,
+            optimizeForLatency: true,
         }
-        // config.avc = { 
-        //     format: "annexb",
-        //     maxBFrames: 0,
-        // };
         let mediaSource;
         let sourceBuffer;
         let websocket;

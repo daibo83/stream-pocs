@@ -67,18 +67,18 @@
             codec: "hev1.1.0.L30.b0",
             width: 1920,
             height: 1080,
-            bitrate: 2_000_000, // 2 Mbps
+            // bitrate: 2_000_000, // 2 Mbps
             framerate: 60,
             latencyMode: "realtime",
             hardwareAcceleration: "prefer-hardware",
         };
-        if (config.codec.startsWith("avc")) {
-            config.avc = {
-                format: "annexb",
-                maxBFrames: 0,
-            };
-            config.hardwareAcceleration = "prefer-hardware";
-        }
+        // if (config.codec.startsWith("avc")) {
+        //     config.avc = {
+        //         format: "annexb",
+        //         maxBFrames: 0,
+        //     };
+        //     config.hardwareAcceleration = "prefer-hardware";
+        // }
 
         let encoder;
         let websocket;

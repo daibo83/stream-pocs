@@ -63,6 +63,8 @@ async fn handle_publisher(ws: WebSocket, stream_id: StreamId, clients: Clients, 
 
     let (_ws_tx, mut ws_rx) = ws.split();
     let mut first = true;
+    let mut counter = 0;
+    let mut instant = std::time::Instant::now();
     while let Some(result) = ws_rx.next().await {
         match result {
             Ok(msg) => {
@@ -70,6 +72,12 @@ async fn handle_publisher(ws: WebSocket, stream_id: StreamId, clients: Clients, 
                     first = false;
                     let mut codec_descriptions_write = codec_descriptions.write().await;
                     codec_descriptions_write.insert(stream_id.clone(), msg.as_bytes().to_vec());
+                }
+                counter += msg.as_bytes().len();
+                if instant.elapsed().as_secs() >= 1 {
+                    println!("{} bytes/s", counter);
+                    counter = 0;
+                    instant = std::time::Instant::now();
                 }
                 let clients_read = clients.read().await;
                 if let Some(stream_clients) = clients_read.get(&stream_id) {
