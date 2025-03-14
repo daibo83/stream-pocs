@@ -53,10 +53,14 @@ async fn handle_publisher(ws: WebSocket, stream_id: StreamId, clients: Clients) 
     println!("New publisher connected for stream: {}", stream_id);
 
     let (_ws_tx, mut ws_rx) = ws.split();
-
+    let mut first = true;
     while let Some(result) = ws_rx.next().await {
         match result {
             Ok(msg) => {
+                if first {
+                    first = false;
+                    println!("First message from publisher: {:?}", msg);
+                }
                 let clients_read = clients.read().await;
                 if let Some(stream_clients) = clients_read.get(&stream_id) {
                     for client in stream_clients {

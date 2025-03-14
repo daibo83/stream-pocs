@@ -29,6 +29,7 @@
     <!-- <video id="videoPlayer" autoplay controls></video> -->
     <button id="startButton">Start Playing</button>
     <div id="status">Not connected</div>
+    <script src="https://rawgithub.com/kawanet/msgpack-lite/master/dist/msgpack.min.js"></script>
 
     <script>
         const canvas = document.getElementById('canvas');
@@ -78,14 +79,13 @@
                 console.log(e.message);
             },
         };
-        let description_array = new Uint8Array({"0":1,"1":1,"2":96,"3":0,"4":0,"5":0,"6":176,"7":0,"8":0,"9":0,"10":0,"11":0,"12":123,"13":240,"14":0,"15":252,"16":253,"17":248,"18":248,"19":0,"20":0,"21":15,"22":3,"23":160,"24":0,"25":1,"26":0,"27":24,"28":64,"29":1,"30":12,"31":1,"32":255,"33":255,"34":1,"35":96,"36":0,"37":0,"38":3,"39":0,"40":176,"41":0,"42":0,"43":3,"44":0,"45":0,"46":3,"47":0,"48":123,"49":27,"50":2,"51":64,"52":161,"53":0,"54":1,"55":0,"56":47,"57":66,"58":1,"59":1,"60":1,"61":96,"62":0,"63":0,"64":3,"65":0,"66":176,"67":0,"68":0,"69":3,"70":0,"71":0,"72":3,"73":0,"74":123,"75":160,"76":3,"77":192,"78":128,"79":17,"80":7,"81":203,"82":136,"83":27,"84":185,"85":20,"86":140,"87":185,"88":248,"89":79,"90":66,"91":250,"92":134,"93":245,"94":74,"95":106,"96":2,"97":2,"98":3,"99":108,"100":31,"101":194,"102":1,"103":4,"104":162,"105":0,"106":1,"107":0,"108":7,"109":68,"110":1,"111":192,"112":114,"113":240,"114":91,"115":36});
+        let description_array = new Uint8Array(([1, 1, 96, 0, 0, 0, 176, 0, 0, 0, 0, 0, 123, 240, 0, 252, 253, 248, 248, 0, 0, 15, 3, 160, 0, 1, 0, 24, 64, 1, 12, 1, 255, 255, 1, 96, 0, 0, 3, 0, 176, 0, 0, 3, 0, 0, 3, 0, 123, 27, 2, 64, 161, 0, 1, 0, 47, 66, 1, 1, 1, 96, 0, 0, 3, 0, 176, 0, 0, 3, 0, 0, 3, 0, 123, 160, 3, 192, 128, 17, 7, 203, 136, 27, 185, 20, 140, 185, 248, 79, 66, 250, 134, 245, 74, 106, 2, 2, 3, 108, 31, 194, 1, 4, 162, 0, 1, 0, 7, 68, 1, 192, 114, 240, 91, 36]));
         let arraybuffer = new ArrayBuffer(description_array.length);
-        description_array.forEach((byte, i) => {
-            arraybuffer[i] = byte;
-        });
+        arraybuffer = description_array.buffer;
+        console.log(arraybuffer);
         const config = {
-            codec: "avc1.640c34",
-            // codec: "hev1.1.0.L30.b0",
+            // codec: "avc1.640c34",
+            codec: "hev1.1.0.L30.b0",
             description: arraybuffer,
             codedHeight: 1080,
             codedWidth: 1920,
@@ -98,10 +98,10 @@
             hardwareAcceleration: "no-preference",
             // optimizeForLatency: true,
         }
-        config.avc = { 
-            format: "annexb",
-            maxBFrames: 0,
-        };
+        // config.avc = { 
+        //     format: "annexb",
+        //     maxBFrames: 0,
+        // };
         let mediaSource;
         let sourceBuffer;
         let websocket;
