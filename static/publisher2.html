@@ -147,8 +147,10 @@
                 }
             }
         }
+        var descriptionSent= true;
         function handleChunk(chunk, metadata) {
-            if (metadata.decoderConfig) {
+            if (metadata.decoderConfig && descriptionSent) {
+                descriptionSent = false;
                 // console.log("Decoder config:", new Uint8Array(metadata.decoderConfig.description));
                 websocket.send(metadata.decoderConfig.description);
             }

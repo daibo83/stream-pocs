@@ -6,25 +6,28 @@ use warp::ws::{Message, WebSocket};
 use warp::Filter;
 type StreamId = String;
 type Clients = Arc<RwLock<HashMap<StreamId, Vec<mpsc::UnboundedSender<Message>>>>>;
+type CodecDescriptions = Arc<RwLock<HashMap<StreamId, Vec<u8>>>>;
 
 #[tokio::main]
 async fn main() {
     let clients: Clients = Arc::new(RwLock::new(HashMap::new()));
-
+    let codec_descriptions: Arc<RwLock<HashMap<StreamId, Vec<u8>>>> = Arc::new(RwLock::new(HashMap::new()));
     // Route for video publishers
     let publish = warp::path!("publish" / StreamId)
         .and(warp::ws())
         .and(with_clients(clients.clone()))
-        .map(|stream_id: StreamId, ws: warp::ws::Ws, clients| {
-            ws.on_upgrade(move |socket| handle_publisher(socket, stream_id, clients))
+        .and(with_codec_descriptions(codec_descriptions.clone()))
+        .map(|stream_id: StreamId, ws: warp::ws::Ws, clients: Clients, codec_descriptions: CodecDescriptions| {
+            ws.on_upgrade(move |socket| handle_publisher(socket, stream_id, clients, codec_descriptions))
         });
 
     // Route for video consumers
     let consume = warp::path!("consume" / StreamId)
         .and(warp::ws())
         .and(with_clients(clients.clone()))
-        .map(|stream_id: StreamId, ws: warp::ws::Ws, clients| {
-            ws.on_upgrade(move |socket| handle_consumer(socket, stream_id, clients))
+        .and(with_codec_descriptions(codec_descriptions.clone()))
+        .map(|stream_id: StreamId, ws: warp::ws::Ws, clients, codec_descriptions: Arc<RwLock<HashMap<String, Vec<u8>>>>| {
+            ws.on_upgrade(move |socket| handle_consumer(socket, stream_id, clients, codec_descriptions))
         });
     // Route to serve the player HTML
     // Route to serve the publisher HTML
@@ -49,7 +52,13 @@ fn with_clients(
     warp::any().map(move || clients.clone())
 }
 
-async fn handle_publisher(ws: WebSocket, stream_id: StreamId, clients: Clients) {
+fn with_codec_descriptions(
+    codec_descriptions: CodecDescriptions,
+) -> impl Filter<Extract = (CodecDescriptions,), Error = std::convert::Infallible> + Clone {
+    warp::any().map(move || codec_descriptions.clone())
+}
+
+async fn handle_publisher(ws: WebSocket, stream_id: StreamId, clients: Clients, codec_descriptions: Arc<RwLock<HashMap<StreamId, Vec<u8>>>>) {
     println!("New publisher connected for stream: {}", stream_id);
 
     let (_ws_tx, mut ws_rx) = ws.split();
@@ -59,7 +68,8 @@ async fn handle_publisher(ws: WebSocket, stream_id: StreamId, clients: Clients) 
             Ok(msg) => {
                 if first {
                     first = false;
-                    println!("First message from publisher: {:?}", msg);
+                    let mut codec_descriptions_write = codec_descriptions.write().await;
+                    codec_descriptions_write.insert(stream_id.clone(), msg.as_bytes().to_vec());
                 }
                 let clients_read = clients.read().await;
                 if let Some(stream_clients) = clients_read.get(&stream_id) {
@@ -78,7 +88,7 @@ async fn handle_publisher(ws: WebSocket, stream_id: StreamId, clients: Clients) 
     println!("Publisher disconnected for stream: {}", stream_id);
 }
 
-async fn handle_consumer(ws: WebSocket, stream_id: StreamId, clients: Clients) {
+async fn handle_consumer(ws: WebSocket, stream_id: StreamId, clients: Clients, codec_descriptions: CodecDescriptions) {
     println!("New consumer connected for stream: {}", stream_id);
 
     let (mut ws_tx, mut ws_rx) = ws.split();
@@ -102,9 +112,17 @@ async fn handle_consumer(ws: WebSocket, stream_id: StreamId, clients: Clients) {
             }
         }
     });
-
+    let stream_id_clone = stream_id.clone();
     // Send video chunks to the client
     let outgoing = tokio::spawn(async move {
+        let codec_descriptions = {
+            let codec_descriptions_read = codec_descriptions.read().await;
+            codec_descriptions_read.get(&stream_id_clone).cloned().unwrap()
+        };
+        if let Err(e) = ws_tx.send(Message::binary(codec_descriptions)).await {
+            eprintln!("Error sending codec description to consumer: {:?}", e);
+            return;
+        }
         while let Some(msg) = rx.recv().await {
             if let Err(e) = ws_tx.send(msg).await {
                 eprintln!("Error sending message to consumer: {:?}", e);
