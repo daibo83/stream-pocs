@@ -81,7 +81,15 @@
 
         let encoder;
         let websocket;
-        async function startPublishing(webcam){
+        let constraints = {
+            audio: true,
+            video: {
+                width: { ideal: 1920},
+                height: { ideal: 1080 },
+                frameRate: { ideal: 60 }
+            }
+        };
+        async function startPublishing(userMedia) {
             const { supported } = await VideoEncoder.isConfigSupported(config);
             if (supported) {
                 encoder = new VideoEncoder(init);
@@ -94,16 +102,6 @@
             websocket.onopen = () => {
                 statusDiv.textContent = 'Connected';
             };
-            let constraints = {
-                audio: true,
-                video: {
-                    width: { ideal: 1920},
-                    height: { ideal: 1080 },
-                    frameRate: { ideal: 60 }
-                }
-            };
-            
-            const userMedia = webcam ? await navigator.mediaDevices.getUserMedia(constraints) : await navigator.mediaDevices.getDisplayMedia({ video: constraints});
             videoPreview.srcObject = userMedia;
             let frameCounter = 0;
             const track = userMedia.getVideoTracks()[0];
@@ -150,7 +148,7 @@
         }
         function handleChunk(chunk, metadata) {
             if (metadata.decoderConfig) {
-                // console.log("Decoder config:", metadata.decoderConfig);
+                console.log("Decoder config:", JSON.stringify(metadata.decoderConfig));
                 // websocket.send(JSON.stringify(metadata.decoderConfig));
             }
 
@@ -159,11 +157,13 @@
             websocket.send(chunkData);
         }
 
-        startButton.onclick = function() {
-            startPublishing(true);
+        startButton.onclick = async function() {
+            userMedia = await navigator.mediaDevices.getUserMedia(constraints);
+            startPublishing(userMedia);
         }
-        startButton2.onclick = function() {
-            startPublishing(false);
+        startButton2.onclick = async function() {
+            userMedia = await navigator.mediaDevices.getDisplayMedia({ video: constraints});
+            startPublishing(userMedia);
         }
 
     </script>
