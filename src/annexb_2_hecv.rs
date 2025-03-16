@@ -226,6 +226,32 @@ fn convert_to_length_prefixed(nalus: &[Nalu], exclude_parameter_sets: bool) -> V
     output
 }
 
+fn convert_annexb_to_webcodecs_format(input_data: &[u8]) -> (Vec<u8>, Vec<u8>) {
+    // Find NAL units
+    let nalus = find_nal_units(input_data);
+    
+    // Create HVCC box
+    let hvcc = create_hvcc(&nalus);
+    
+    // For WebCodecs, include only VCL NAL units in the length-prefixed data
+    let mut output = Vec::new();
+    
+    for nalu in &nalus {
+        // Only include VCL NAL units (actual frame data)
+        if nalu.nalu_type == NaluType::VCL {
+            let nalu_data = nalu.get_data_without_start_code();
+            
+            // Add length prefix (4 bytes)
+            let length = nalu_data.len() as u32;
+            output.extend_from_slice(&length.to_be_bytes());
+            
+            // Add NAL unit data
+            output.extend_from_slice(nalu_data);
+        }
+    }
+    
+    (hvcc, output)
+}
 
 /// Converts HEVC Annex B format to HVCC format for WebCodecs
 fn convert_annexb_to_hvcc(input_data: &[u8]) -> (Vec<u8>, Vec<u8>) {
