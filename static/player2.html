@@ -25,11 +25,12 @@
     </style>
 </head>
 <body>
+
+    <video id="videoPlayer" autoplay muted></video>
     <canvas id="canvas" width="640" height="480"></canvas>
     <!-- <video id="videoPlayer" autoplay controls></video> -->
     <button id="startButton">Start Playing</button>
     <div id="status">Not connected</div>
-    <script src="https://rawgithub.com/kawanet/msgpack-lite/master/dist/msgpack.min.js"></script>
 
     <script>
         const canvas = document.getElementById('canvas');
@@ -37,9 +38,26 @@
         let pendingFrames = [];
         let underflow = true;
         let baseTime = 0;
+        let writer;
+        let trackGenerator;
+        let videoStream;
+        const videoElement = document.getElementById('videoPlayer');
+        if (typeof MediaStreamTrackGenerator === "undefined") {
+            trackGenerator = new VideoTrackGenerator();
+            videoStream = new MediaStream([trackGenerator.track]);
+            videoElement.srcObject = videoStream;
+            writer = trackGenerator.writable.getWriter();
+        }
+        else {
+            trackGenerator = new MediaStreamTrackGenerator({ kind: "video" });
+            videoStream = new MediaStream([trackGenerator]);
+            videoElement.srcObject = videoStream;
+            writer = trackGenerator.writable.getWriter();
+        }
         function handleFrame(frame) {
-            pendingFrames.push(frame);
-            if (underflow) setTimeout(renderFrame, 0);
+            // pendingFrames.push(frame);
+            writer.write(frame);
+            // if (underflow) setTimeout(renderFrame, 0);
         }
         function calculateTimeUntilNextFrame(timestamp) {
             if (baseTime == 0) baseTime = performance.now();
@@ -81,18 +99,30 @@
         };
         const config = {
             // codec: "avc1.640c34",
-            codec: "hev1.1.0.L30.b0",
-            codedHeight: 1080,
-            codedWidth: 1920,
+            codec: "hev1.4.17.H186.b0",
+            codedHeight: 1920,
+            codedWidth: 1080,
             colorSpace: {
                 fullRange: false,
                 matrix: "bt709",
                 primaries: "bt709",
                 transfer: "bt709"
             },
-            hardwareAcceleration: "no-preference",
+            hardwareAcceleration: "prefer-hardware",
             optimizeForLatency: true,
         }
+        // if (config.codec.startsWith("avc")) {
+        //     config.avc = {
+        //         format: "annexb",
+        //         maxBFrames: 0,
+        //     };
+        // }
+        // if (config.codec.startsWith("hev1")) {
+        //     config.hevc = {
+        //         format: "annexb",
+        //         maxBFrames: 0,
+        //     };
+        // }
         let mediaSource;
         let sourceBuffer;
         let websocket;

@@ -1,4 +1,7 @@
+
 use futures::{SinkExt, StreamExt};
+use annexb_2_hecv::{convert_annexb_to_length_prefixed, create_hvcc_box};
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
@@ -7,7 +10,7 @@ use warp::Filter;
 type StreamId = String;
 type Clients = Arc<RwLock<HashMap<StreamId, Vec<mpsc::UnboundedSender<Message>>>>>;
 type CodecDescriptions = Arc<RwLock<HashMap<StreamId, Vec<u8>>>>;
-
+mod annexb_2_hecv;
 #[tokio::main]
 async fn main() {
     let clients: Clients = Arc::new(RwLock::new(HashMap::new()));
@@ -70,8 +73,11 @@ async fn handle_publisher(ws: WebSocket, stream_id: StreamId, clients: Clients, 
             Ok(msg) => {
                 if first {
                     first = false;
+                    let extradata = create_hvcc_box(msg.as_bytes());
+                    // println!("extradata: {:?}", extradata);
+                    println!("Codec description: {:?}", extradata);
                     let mut codec_descriptions_write = codec_descriptions.write().await;
-                    codec_descriptions_write.insert(stream_id.clone(), msg.as_bytes().to_vec());
+                    codec_descriptions_write.insert(stream_id.clone(), extradata);
                 }
                 counter += msg.as_bytes().len();
                 if instant.elapsed().as_secs() >= 1 {
@@ -81,6 +87,7 @@ async fn handle_publisher(ws: WebSocket, stream_id: StreamId, clients: Clients, 
                 }
                 let clients_read = clients.read().await;
                 if let Some(stream_clients) = clients_read.get(&stream_id) {
+                    let msg = Message::binary(convert_annexb_to_length_prefixed(msg.as_bytes(), false));
                     for client in stream_clients {
                         let _ = client.send(msg.clone());
                     }
@@ -126,7 +133,9 @@ async fn handle_consumer(ws: WebSocket, stream_id: StreamId, clients: Clients, c
         let codec_descriptions = {
             let codec_descriptions_read = codec_descriptions.read().await;
             codec_descriptions_read.get(&stream_id_clone).cloned().unwrap()
+            // Message::binary([1, 1, 96, 0, 0, 0, 176, 0, 0, 0, 0, 0, 93, 240, 0, 252, 253, 248, 248, 0, 0, 15, 3, 160, 0, 1, 0, 24, 64, 1, 12, 1, 255, 255, 1, 96, 0, 0, 3, 0, 176, 0, 0, 3, 0, 0, 3, 0, 150, 23, 2, 64, 161, 0, 1, 0, 42, 66, 1, 1, 1, 96, 0, 0, 3, 0, 176, 0, 0, 3, 0, 0, 3, 0, 150, 160, 1, 172, 32, 2, 44, 119, 226, 5, 238, 69, 145, 75, 255, 46, 127, 19, 250, 154, 128, 128, 128, 128, 64, 162, 0, 1, 0, 7, 68, 1, 192, 114, 240, 83, 36])
         };
+
         if let Err(e) = ws_tx.send(Message::binary(codec_descriptions)).await {
             eprintln!("Error sending codec description to consumer: {:?}", e);
             return;

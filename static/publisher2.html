@@ -29,7 +29,6 @@
     <button id="startButton">Puiblish WebCam</button>
     <button id="startButton2">Publish Screen</button>
     <div id="status">Not connected</div>
-    <script src="https://rawgithub.com/kawanet/msgpack-lite/master/dist/msgpack.min.js"></script>
     <script>
         const maybeCodecs = ["aac","ac-3","audio","avc1","avc1, mp4a.40","avc1, mp4a.40.02","avc1, mp4a.40.2","avc1.42001E","avc1.42101E","avc1.42701E","avc1.42E01E","avc1.42E01E, mp4a.40","avc1.42E01E, mp4a.40.02","avc1.42E01E, mp4a.40.2","avc1.42F01E","avc3","avc3, mp4a.40","avc3, mp4a.40.02","avc3", "mp4a.40.2","avc3.42801E","avc3.42C01E","avc3.42E01E","avc3.42E01E, mp4a.40","avc3.42E01E, mp4a.40.05","avc3.42E01E, mp4a.40.29","avc3.42E01E, mp4a.40.5","ec-3","flac","h264","hev1.1.6.L93.B0","hev1.1.6.L93.B0,mp4a.40.5","hevc","hvc1.1.6.L93.B0","hvc1.1.6.L93.B0,mp4a.40.5","mp4a.40","mp4a.40.02","mp4a.40.2","mp4a.66","mp4a.67","mp4a.68","mp4a.69","mp4a.6B","mp4a.A5","mp4a.A6","mp4a.a5","mp4a.a6","opus","theora","video","vp09.00.10.08","vp8","vp9"];
 
@@ -64,12 +63,13 @@
         };
         const config = {
             // codec: "avc1.640c34",
-            codec: "hev1.1.0.L30.b0",
-            width: 1920,
-            height: 1080,
-            // bitrate: 2_000_000, // 2 Mbps
-            framerate: 60,
-            latencyMode: "realtime",
+            codec: "hev1.4.17.H186.b0",
+            width: 1280,
+            height: 720,
+            bitrate: 2_000_000, // 2 Mbps
+            // bitrateMode: "variable",
+            framerate: 30,
+            latencyMode: "quality",
             hardwareAcceleration: "prefer-hardware",
         };
         // if (config.codec.startsWith("avc")) {
@@ -77,20 +77,29 @@
         //         format: "annexb",
         //         maxBFrames: 0,
         //     };
-        //     config.hardwareAcceleration = "prefer-hardware";
         // }
-
+        if (config.codec.startsWith("hev1")) {
+            config.hevc = {
+                format: "annexb",
+                maxBFrames: 0,
+            };
+        }
         let encoder;
         let websocket;
         let constraints = {
             audio: true,
             video: {
-                width: { ideal: 1920},
-                height: { ideal: 1080 },
-                frameRate: { ideal: 60 }
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                frameRate: { ideal: 30 }
             }
         };
         async function startPublishing(userMedia) {
+            const track = userMedia.getVideoTracks()[0];
+            let settings = track.getSettings();
+            config.width = settings.width;
+            config.height = settings.height;
+            config.framerate = settings.frameRate;
             const { supported } = await VideoEncoder.isConfigSupported(config);
             if (supported) {
                 encoder = new VideoEncoder(init);
@@ -100,14 +109,16 @@
             }
             websocket = new WebSocket(websocketUrl);
             websocket.binaryType = "arraybuffer";
+            let connected = false;
             websocket.onopen = () => {
+                connected = true;
                 statusDiv.textContent = 'Connected';
             };
+            while (!connected) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
             videoPreview.srcObject = userMedia;
             let frameCounter = 0;
-            const track = userMedia.getVideoTracks()[0];
-            track.applyConstraints(constraints).catch(e => console.log(e));
-            let settings = track.getSettings();
             await videoPreview.play();
             // if safari
             if (typeof MediaStreamTrackProcessor === "undefined") {
@@ -122,7 +133,7 @@
                         frame.close();
                     } else {
                         frameCounter++;
-                        const keyFrame = frameCounter % 60 == 0;
+                        const keyFrame = frameCounter % 120 == 0;
                         encoder.encode(frame, { keyFrame });
                         frame.close();
                     }
@@ -140,18 +151,18 @@
                         frame.close();
                     } else {
                         frameCounter++;
-                        const keyFrame = frameCounter % 60 == 0;
+                        const keyFrame = frameCounter % 120 == 0;
                         encoder.encode(frame, { keyFrame });
                         frame.close();
                     }
                 }
             }
         }
-        var descriptionSent= true;
+        var descriptionNotSent = false;
         function handleChunk(chunk, metadata) {
-            if (metadata.decoderConfig && descriptionSent) {
-                descriptionSent = false;
-                // console.log("Decoder config:", new Uint8Array(metadata.decoderConfig.description));
+            if (metadata.decoderConfig && descriptionNotSent) {
+                descriptionNotSent = false;
+                console.log("Decoder config:", new Uint8Array(metadata.decoderConfig.description));
                 websocket.send(metadata.decoderConfig.description);
             }
 
@@ -165,7 +176,15 @@
             startPublishing(userMedia);
         }
         startButton2.onclick = async function() {
-            userMedia = await navigator.mediaDevices.getDisplayMedia({ video: constraints});
+            let screenConstraints = {
+                audio: true,
+                video: {
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                    frameRate: { ideal: 60 }
+                }
+            };
+            userMedia = await navigator.mediaDevices.getDisplayMedia({ video: screenConstraints});
             startPublishing(userMedia);
         }
 
