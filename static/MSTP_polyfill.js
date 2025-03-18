@@ -1,22 +1,7 @@
-
-importScripts("MSTP_polyfill.js");
-
-self.onmessage = async ({data: {track}}) => {
-    console.log(track);
-    const trackProcessor = new MediaStreamTrackProcessor({track});
-    const reader = trackProcessor.readable.getReader();
-    while (true) {
-        const result = await reader.read();
-        if (result.done) break;
-        const frame = result.value;
-        self.postMessage(frame);
-    }
-};
-
 if (!self.MediaStreamTrackProcessor) {
     self.MediaStreamTrackProcessor = class MediaStreamTrackProcessor {
-      constructor({track}) {
-        console.log("using MediaStreamTrackProcessor polyfill");
+      constructor(track) {
+        console.log(track);
         if (track.kind == "video") {
           this.readable = new ReadableStream({
             async start(controller) {

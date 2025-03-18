@@ -28,10 +28,9 @@
 
     <video id="videoPlayer" autoplay muted></video>
     <canvas id="canvas" width="640" height="480"></canvas>
-    <!-- <video id="videoPlayer" autoplay controls></video> -->
     <button id="startButton">Start Playing</button>
     <div id="status">Not connected</div>
-
+    <script src="MSTG_polyfill.js"></script>
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -99,9 +98,9 @@
         };
         const config = {
             // codec: "avc1.640c34",
-            codec: "hev1.4.17.H186.b0",
-            codedHeight: 1920,
-            codedWidth: 1080,
+            codec: "hev1.1.0.L30.b0",
+            codedHeight: 1280,
+            codedWidth: 720,
             colorSpace: {
                 fullRange: false,
                 matrix: "bt709",
