@@ -26,7 +26,7 @@
 </head>
 <body>
     <video id="videoPreview" autoplay muted></video>
-    <button id="startButton">Puiblish WebCam</button>
+    <button id="startButton">Publish WebCam</button>
     <button id="startButton2">Publish Screen</button>
     <div id="status">Not connected</div>
     <!-- <script src="MSTP_polyfill.js"></script> -->
@@ -54,8 +54,8 @@
         const startButton = document.getElementById('startButton');
         const startButton2 = document.getElementById('startButton2');
         const statusDiv = document.getElementById('status');
-        const websocketUrl = `wss://${window.location.host}/publish/test_stream`;
-        const websocketAudioUrl = `wss://${window.location.host}/publish/test_stream_audio`;
+        const websocketUrlEven = `wss://${window.location.host}/publish/test_stream_even`;
+        const websocketUrlOdd = `wss://${window.location.host}/publish/test_stream_odd`;
         const init = {
             output: handleChunk,
             error: (e) => {
@@ -64,27 +64,23 @@
         };
         const config = {
             // codec: "avc1.640c34",
-            codec: "hev1.1.0.L30.b0",
-            width: 1280,
-            height: 720,
-            bitrate: 2_000_000, // 2 Mbps
-            // bitrateMode: "variable",
-            framerate: 30,
-            latencyMode: "quality",
+            codec: "hev1.2.17.H186.b0",
+            bitrateMode: "variable",
+            latencyMode: "realtime",
             hardwareAcceleration: "prefer-hardware",
         };
-        // if (config.codec.startsWith("avc")) {
-        //     config.avc = {
-        //         format: "annexb",
-        //         maxBFrames: 0,
-        //     };
-        // }
-        // if (config.codec.startsWith("hev1")) {
-        //     config.hevc = {
-        //         format: "annexb",
-        //         maxBFrames: 0,
-        //     };
-        // }
+        if (config.codec.startsWith("avc")) {
+            config.avc = {
+                // format: "annexb",
+                maxBFrames: 1,
+            };
+        }
+        if (config.codec.startsWith("hev1")) {
+            config.hevc = {
+                // format: "annexb",
+                maxBFrames: 1,
+            };
+        }
         let encoder;
         let websocket;
         let constraints = {
@@ -95,6 +91,7 @@
                 frameRate: { ideal: 30 }
             }
         };
+        let frameCounter = 0;
         async function startPublishing(userMedia) {
             const track = userMedia.getVideoTracks()[0];
             let settings = track.getSettings();
@@ -108,7 +105,7 @@
             } else {
                 console.log("The configuration is not supported.");
             }
-            websocket = new WebSocket(websocketUrl);
+            websocket = new WebSocket(websocketUrlEven);
             websocket.binaryType = "arraybuffer";
             let connected = false;
             websocket.onopen = () => {
@@ -119,7 +116,6 @@
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
             videoPreview.srcObject = userMedia;
-            let frameCounter = 0;
             await videoPreview.play();
             // if safari
             if (typeof MediaStreamTrackProcessor === "undefined") {
@@ -174,17 +170,19 @@
 
         startButton.onclick = async function() {
             userMedia = await navigator.mediaDevices.getUserMedia(constraints);
+            config.bitrate = 1_000_000;
             startPublishing(userMedia);
         }
         startButton2.onclick = async function() {
             let screenConstraints = {
                 audio: true,
                 video: {
-                    // width: { ideal: 1920 },
-                    // height: { ideal: 1080 },
-                    frameRate: { ideal: 30 }
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                    frameRate: { ideal: 60 }
                 }
             };
+            config.bitrate = 8_000_000;
             userMedia = await navigator.mediaDevices.getDisplayMedia({ video: screenConstraints});
             startPublishing(userMedia);
         }

@@ -51,8 +51,8 @@ async fn main() {
     println!("Server started on http://localhost:3030");
     warp::serve(routes)
         .tls()
-        .cert_path("./video.ermis.network/cert1.pem")
-        .key_path("./video.ermis.network/privkey1.pem")
+        .cert_path("../video.belo.dev/cert1.pem")
+        .key_path("../video.belo.dev/privkey1.pem")
         .run(([0, 0, 0, 0], 3040))
         .await;
 }
