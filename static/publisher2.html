@@ -178,10 +178,8 @@
             const chunkData = new ArrayBuffer(chunk.byteLength+4);
             const view = new DataView(chunkData);
             view.setUint32(0, chunk.timestamp);
-            const chunkView = new Uint8Array(chunkData, 4);
-            let data = new Uint8Array(chunk.byteLength);
-            chunk.copyTo(data);
-            chunkView.set(data);
+            const chunkView = new DataView(chunkData, 4);
+            chunk.copyTo(chunkView);
             websocket.send(chunkData);
         }
 
