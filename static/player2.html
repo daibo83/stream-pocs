@@ -31,13 +31,10 @@
 <body>
 
     <video id="videoPlayer" autoplay muted></video>
-    <canvas id="canvas" width="640" height="480"></canvas>
     <button id="startButton">Start Playing</button>
     <div id="status">Not connected</div>
     <script src="MSTG_polyfill.js"></script>
     <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
         let pendingFrames = [];
         let underflow = true;
         let baseTime = 0;
@@ -100,26 +97,7 @@
                 console.log(e.message);
             },
         };
-        const config = {
-            // codec: "av01.1.23H.08",
-            codec: "hev1.2.17.H186.b0",
-            codedHeight: 1280,
-            codedWidth: 720,
-            hardwareAcceleration: "prefer-hardware",
-            optimizeForLatency: true,
-        }
-        // if (config.codec.startsWith("avc")) {
-        //     config.avc = {
-        //         format: "annexb",
-        //         maxBFrames: 0,
-        //     };
-        // }
-        // if (config.codec.startsWith("hev1")) {
-        //     config.hevc = {
-        //         format: "annexb",
-        //         maxBFrames: 0,
-        //     };
-        // }
+        let config;
         let mediaSource;
         let sourceBuffer;
         let websocket;
@@ -128,30 +106,34 @@
         let decoder;
 
         async function startPlaying() {
-            const { supported } = await VideoDecoder.isConfigSupported(config);
-            if (supported) {
-                decoder = new VideoDecoder(init);
-                decoder.configure(config);
-            } else {
-                console.log('Configuration not supported');
-            }
+            decoder = new VideoDecoder(init);
             websocket = new WebSocket(websocketUrl);
             websocket.binaryType = "arraybuffer";
             websocket.onopen = () => {
                 statusDiv.textContent = 'Connected';
             };
-            var description_received = false;
+            var config_received = false;
             websocket.onmessage = (event) => {
-                if (!description_received) {
-                    description_received = true;
-                    config.description = event.data;
+                if (!config_received) {
+                    let dataview = new DataView(event.data);
+                    let jsonlength = dataview.getUint16(0);
+                    let textDecoder = new TextDecoder();
+                    let jsonbytes = event.data.slice(2, jsonlength + 2);
+                    let jsonstring = textDecoder.decode(jsonbytes);
+                    config = JSON.parse(jsonstring);
+                    let description = event.data.slice(jsonlength + 2);
+                    config.description = description;
+                    console.log("config", config);
+                    config_received = true;
                     decoder.configure(config);
                     return;
                 }
+                let dataview = new DataView(event.data);
+                let timestamp = dataview.getUint32(0);
                 const chunk = new EncodedVideoChunk({
-                    timestamp: 0,
+                    timestamp,
                     type: "key",
-                    data: event.data,
+                    data: event.data.slice(4),
                 });
                 if (decoder.state == "closed") {
                     decoder = new VideoDecoder(init);

@@ -155,16 +155,33 @@
                 }
             }
         }
-        var descriptionNotSent = true;
+        var configNotSent = true;
         function handleChunk(chunk, metadata) {
-            if (metadata.decoderConfig && descriptionNotSent) {
-                descriptionNotSent = false;
-                console.log("Decoder config:", metadata.decoderConfig);
-                websocket.send(metadata.decoderConfig.description);
+            if (metadata.decoderConfig && configNotSent) {
+                configNotSent = false;
+                let decoderConfig = metadata.decoderConfig;
+                let description = decoderConfig.description;
+                let json = JSON.stringify(decoderConfig);
+                let textencoder = new TextEncoder();
+                let jsonbytes = textencoder.encode(json)
+                let arraybuffer = new ArrayBuffer(2+decoderConfig.description.byteLength+jsonbytes.length);
+                let view = new DataView(arraybuffer);
+                view.setUint16(0, jsonbytes.length);
+                let jsonView = new Uint8Array(arraybuffer, 2);
+                jsonView.set(jsonbytes);
+                let descriptionView = new Uint8Array(arraybuffer, 2+jsonbytes.length);
+                descriptionView.set(new Uint8Array(description));
+                websocket.send(arraybuffer);
+                // websocket.send(JSON.stringify(decoderConfig));
             }
 
-            const chunkData = new ArrayBuffer(chunk.byteLength);
-            chunk.copyTo(chunkData);
+            const chunkData = new ArrayBuffer(chunk.byteLength+4);
+            const view = new DataView(chunkData);
+            view.setUint32(0, chunk.timestamp);
+            const chunkView = new Uint8Array(chunkData, 4);
+            let data = new Uint8Array(chunk.byteLength);
+            chunk.copyTo(data);
+            chunkView.set(data);
             websocket.send(chunkData);
         }
 
@@ -182,7 +199,7 @@
                     frameRate: { ideal: 60 }
                 }
             };
-            config.bitrate = 8_000_000;
+            config.bitrate = 4_000_000;
             userMedia = await navigator.mediaDevices.getDisplayMedia({ video: screenConstraints});
             startPublishing(userMedia);
         }

@@ -48,12 +48,13 @@ async fn main() {
         .or(consume)
         .or(index)
         .with(warp::cors().allow_any_origin());
-    println!("Server started on http://localhost:3030");
+    let port = 3043;
+    println!("Server started on http://localhost:{}", port);
     warp::serve(routes)
         .tls()
-        .cert_path("../video.belo.dev/cert1.pem")
-        .key_path("../video.belo.dev/privkey1.pem")
-        .run(([0, 0, 0, 0], 3040))
+        .cert_path("./cert.crt")
+        .key_path("./cert.key")
+        .run(([0, 0, 0, 0], port))
         .await;
 }
 
