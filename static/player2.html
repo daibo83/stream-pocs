@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Player with Jitter Buffer</title>
+    <title>Video Player</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -13,130 +14,138 @@
             padding: 20px;
             background-color: #f0f0f0;
         }
+
         #videoPlayer {
             max-width: 640px;
             width: 100%;
             margin-bottom: 20px;
         }
+
         #status {
             font-weight: bold;
             margin-top: 20px;
         }
     </style>
 </head>
+
 <body>
-    <video id="videoPlayer" autoplay muted controls></video>
+
+    <video id="videoPlayer" autoplay muted></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
     <button id="startButton">Start Playing</button>
     <div id="status">Not connected</div>
     <script src="MSTG_polyfill.js"></script>
     <script>
-        let jitterBuffer = [];
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let pendingFrames = [];
+        let underflow = true;
         let baseTime = 0;
-        let isPlaying = false;
         let writer;
         let trackGenerator;
         let videoStream;
-        
         const videoElement = document.getElementById('videoPlayer');
-        
-        // Initialize MediaStreamTrackGenerator
         if (typeof MediaStreamTrackGenerator === "undefined") {
             trackGenerator = new VideoTrackGenerator();
             videoStream = new MediaStream([trackGenerator.track]);
             videoElement.srcObject = videoStream;
             writer = trackGenerator.writable.getWriter();
-        } else {
+        }
+        else {
             trackGenerator = new MediaStreamTrackGenerator({ kind: "video" });
             videoStream = new MediaStream([trackGenerator]);
             videoElement.srcObject = videoStream;
             writer = trackGenerator.writable.getWriter();
         }
-
         function handleFrame(frame) {
-            insertIntoJitterBuffer(frame);
-            if (!isPlaying) {
-                isPlaying = true;
-                processJitterBuffer();
-            }
+            // pendingFrames.push(frame);
+            writer.write(frame);
+            // if (underflow) setTimeout(renderFrame, 0);
+        }
+        function calculateTimeUntilNextFrame(timestamp) {
+            if (baseTime == 0) baseTime = performance.now();
+            let mediaTime = performance.now() - baseTime;
+            return Math.max(0, timestamp / 1000 - mediaTime);
         }
 
-        function insertIntoJitterBuffer(frame) {
-            // Insert frame in sorted order by timestamp
-            let index = jitterBuffer.findIndex(f => f.timestamp > frame.timestamp);
-            if (index === -1) {
-                jitterBuffer.push(frame);
-            } else {
-                jitterBuffer.splice(index, 0, frame);
-            }
-        }
 
-        function processJitterBuffer() {
-            if (baseTime === 0 && jitterBuffer.length > 0) {
-                // Initialize baseTime with first frame's timestamp
-                const firstFrame = jitterBuffer[0];
-                baseTime = performance.now() - (firstFrame.timestamp / 1000);
-            }
+        async function renderFrame() {
+            underflow = pendingFrames.length == 0;
+            if (underflow) return;
 
-            const now = performance.now();
-            const mediaTime = now - baseTime; // Current media time in milliseconds
+            const frame = pendingFrames.shift();
 
-            // Process all frames that should be displayed by now
-            while (jitterBuffer.length > 0 && jitterBuffer[0].timestamp <= mediaTime * 1000) {
-                const frame = jitterBuffer.shift();
-                writer.write(frame);
-                frame.close();
-            }
+            // Based on the frame's timestamp calculate how much of real time waiting
+            // is needed before showing the next frame.
+            const timeUntilNextFrame = calculateTimeUntilNextFrame(frame.timestamp);
+            await new Promise((r) => {
+                setTimeout(r, timeUntilNextFrame);
+            });
+            var aspectRatio = frame.codedWidth / frame.codedHeight;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerWidth / aspectRatio;
+            ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+            frame.close();
 
-            // Schedule next processing if there's remaining frames
-            if (jitterBuffer.length > 0) {
-                const nextFrameTime = jitterBuffer[0].timestamp / 1000; // Convert to ms
-                const delay = Math.max(0, nextFrameTime - mediaTime);
-                setTimeout(processJitterBuffer, delay);
-            } else {
-                isPlaying = false;
-                baseTime = 0; // Reset for next session
-            }
+            // Immediately schedule rendering of the next frame
+            setTimeout(renderFrame, 0);
         }
 
         const statusDiv = document.getElementById('status');
         const startButton = document.getElementById('startButton');
-        const websocketUrlEven = `wss://${window.location.host}/consume/test_stream_even`;
-        
-        let decoderConfig = {
+        const websocketUrl = `wss://${window.location.host}/consume/test_stream`;
+        const init = {
+            output: handleFrame,
+            error: (e) => {
+                console.log(e.message);
+            },
+        };
+        const config = {
+            // codec: "av01.1.23H.08",
             codec: "hev1.2.17.H186.b0",
+            codedHeight: 1280,
+            codedWidth: 720,
             hardwareAcceleration: "prefer-hardware",
             optimizeForLatency: true,
-        };
-
-        let decoder;
+        }
+        // if (config.codec.startsWith("avc")) {
+        //     config.avc = {
+        //         format: "annexb",
+        //         maxBFrames: 0,
+        //     };
+        // }
+        // if (config.codec.startsWith("hev1")) {
+        //     config.hevc = {
+        //         format: "annexb",
+        //         maxBFrames: 0,
+        //     };
+        // }
+        let mediaSource;
+        let sourceBuffer;
         let websocket;
+        let queue = [];
+        let isBufferUpdating = false;
+        let decoder;
 
         async function startPlaying() {
-            const { supported } = await VideoDecoder.isConfigSupported(decoderConfig);
-            if (!supported) {
-                console.error('Decoder configuration not supported');
-                return;
+            const { supported } = await VideoDecoder.isConfigSupported(config);
+            if (supported) {
+                decoder = new VideoDecoder(init);
+                decoder.configure(config);
+            } else {
+                console.log('Configuration not supported');
             }
-
-            decoder = new VideoDecoder({
-                output: handleFrame,
-                error: e => console.error('Decoder error:', e)
-            });
-            
-            websocket = new WebSocket(websocketUrlEven);
+            websocket = new WebSocket(websocketUrl);
             websocket.binaryType = "arraybuffer";
-            
             websocket.onopen = () => {
                 statusDiv.textContent = 'Connected';
-                decoder.configure(decoderConfig);
             };
             var description_received = false;
-                
             websocket.onmessage = (event) => {
                 if (!description_received) {
                     description_received = true;
-                    decoderConfig.description = event.data;
-                    decoder.configure(decoderConfig);
+                    config.description = event.data;
+                    decoder.configure(config);
                     return;
                 }
                 const chunk = new EncodedVideoChunk({
@@ -144,21 +153,20 @@
                     type: "key",
                     data: event.data,
                 });
-                
+                if (decoder.state == "closed") {
+                    decoder = new VideoDecoder(init);
+                    decoder.configure(config);
+                }
                 try {
                     decoder.decode(chunk);
                 } catch (error) {
-                    console.error('Decoding error:', error);
+                    console.log("handle error", error);
                 }
             };
-
-            websocket.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                statusDiv.textContent = 'Connection error';
-            };
+            await decoder.flush();
         }
-
         startButton.addEventListener('click', startPlaying);
     </script>
 </body>
+
 </html>
