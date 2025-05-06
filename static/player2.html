@@ -82,6 +82,7 @@
                 statusDiv.textContent = 'Connected';
             };
             var config_received = false;
+            let firstFrameTimeStamp;
             websocket.onmessage = (event) => {
                 if (!config_received) {
                     let dataview = new DataView(event.data);
@@ -90,6 +91,7 @@
                     let jsonbytes = event.data.slice(2, jsonlength + 2);
                     let jsonstring = textDecoder.decode(jsonbytes);
                     config = JSON.parse(jsonstring);
+                    firstFrameTimeStamp = config.timestamp;
                     let description = event.data.slice(jsonlength + 2);
                     config.description = description;
                     console.log("config", config);
@@ -99,6 +101,8 @@
                 }
                 let dataview = new DataView(event.data);
                 let timestamp = dataview.getUint32(0);
+                let receive_timestamp = Date.now() - firstFrameTimeStamp;
+                console.log("frame timestamp vs receive timestamp", timestamp, receive_timestamp);
                 const chunk = new EncodedVideoChunk({
                     timestamp,
                     type: "key",

@@ -92,6 +92,7 @@
             }
         };
         let frameCounter = 0;
+        let firstFrameTimeStamp;
         async function startPublishing(userMedia) {
             const track = userMedia.getVideoTracks()[0];
             let settings = track.getSettings();
@@ -157,10 +158,14 @@
         }
         var configNotSent = true;
         function handleChunk(chunk, metadata) {
+            if (!firstFrameTimeStamp) {
+                firstFrameTimeStamp = Date.now();
+            }
             if (metadata.decoderConfig && configNotSent) {
                 configNotSent = false;
                 let decoderConfig = metadata.decoderConfig;
                 let description = decoderConfig.description;
+                decoderConfig.timestamp = firstFrameTimeStamp
                 let json = JSON.stringify(decoderConfig);
                 let textencoder = new TextEncoder();
                 let jsonbytes = textencoder.encode(json)
@@ -174,10 +179,10 @@
                 websocket.send(arraybuffer);
                 // websocket.send(JSON.stringify(decoderConfig));
             }
-
+            let timestamp = Date.now() - firstFrameTimeStamp;
             const chunkData = new ArrayBuffer(chunk.byteLength+4);
             const view = new DataView(chunkData);
-            view.setUint32(0, chunk.timestamp);
+            view.setUint32(0, timestamp);
             const chunkView = new DataView(chunkData, 4);
             chunk.copyTo(chunkView);
             websocket.send(chunkData);
