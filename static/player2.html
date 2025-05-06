@@ -30,14 +30,11 @@
 
 <body>
 
-    <video id="videoPlayer" autoplay muted></video>
+    <video id="videoPlayer" autoplay muted controls></video>
     <button id="startButton">Start Playing</button>
     <div id="status">Not connected</div>
     <script src="MSTG_polyfill.js"></script>
     <script>
-        let pendingFrames = [];
-        let underflow = true;
-        let baseTime = 0;
         let writer;
         let trackGenerator;
         let videoStream;
@@ -58,34 +55,6 @@
             // pendingFrames.push(frame);
             writer.write(frame);
             // if (underflow) setTimeout(renderFrame, 0);
-        }
-        function calculateTimeUntilNextFrame(timestamp) {
-            if (baseTime == 0) baseTime = performance.now();
-            let mediaTime = performance.now() - baseTime;
-            return Math.max(0, timestamp / 1000 - mediaTime);
-        }
-
-
-        async function renderFrame() {
-            underflow = pendingFrames.length == 0;
-            if (underflow) return;
-
-            const frame = pendingFrames.shift();
-
-            // Based on the frame's timestamp calculate how much of real time waiting
-            // is needed before showing the next frame.
-            const timeUntilNextFrame = calculateTimeUntilNextFrame(frame.timestamp);
-            await new Promise((r) => {
-                setTimeout(r, timeUntilNextFrame);
-            });
-            var aspectRatio = frame.codedWidth / frame.codedHeight;
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerWidth / aspectRatio;
-            ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
-            frame.close();
-
-            // Immediately schedule rendering of the next frame
-            setTimeout(renderFrame, 0);
         }
 
         const statusDiv = document.getElementById('status');
